@@ -42,12 +42,12 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
     See also
     --------
     Morlet wavelets
-"""
+    """
 
     if slant is None:
         slant = 1.
     if offset is None:
-        offset = np.zeros([2, 1, 1])
+        offset = np.zeros([2, 1, 1], dtype='int64')
     else:
         offset = np.asanyarray(offset).reshape(2, 1, 1)
 
@@ -63,7 +63,7 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
     raw_gabor = np.exp(-mahalanobis / 2 + 1j * xi * rot_g[0])
 
     gabor = np.fft.fftshift(raw_gabor.reshape(shape)) / (
-        2 * np.pi * sigma0 * sigma0 / slant)
+        2 * np.pi * sigma0**2 / slant**2)
 
     # return transposed in order to be compatible with matlab version
 

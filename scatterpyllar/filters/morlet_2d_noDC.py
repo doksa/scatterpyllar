@@ -6,8 +6,8 @@ import numpy as np
 def morlet_2d_noDC(shape, sigma, xi, theta, slant=None, offset=None):
 
 
-    print "Morlet called with\n %s" % "\n".join(map(repr, [shape,
-sigma, xi, theta, slant]))
+    # print "Morlet called with\n %s" % "\n".join(map(repr, [shape,
+    # sigma, xi, theta, slant]))
     gabor = gabor_2d(shape, sigma, xi, theta, slant, offset)
     envelope = np.abs(gabor)
     K = gabor.sum() / envelope.sum()
