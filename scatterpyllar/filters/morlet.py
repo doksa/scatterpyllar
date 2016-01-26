@@ -1,13 +1,9 @@
-"""Creates a filter bank with all necessary information"""
 import numpy as np
-from morlet_2d_noDC import morlet_2d_noDC
-from gabor_2d import gabor_2d
 import time
-
 import sys
-sys.path.append('/Users/doksa/Dropbox/Projects/mkl_fft')
 import mkl_fft
 
+from utils import rotation_matrix_2d
 
 def ispow2(N):
 
@@ -115,6 +111,86 @@ def select_fft(fft_choice):
     irfft = fft_module.irfft
 
     return fft, ifft, fft2, ifft2, rfft, irfft
+
+
+from utils import rotation_matrix_2d
+
+
+def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
+    """
+    Returns a Gabor filter following the specifications
+
+    This function creates a 2D complex Gabor filter. All parameters
+    are taken to be in integer grid space
+
+
+    Parameters
+    ----------
+    shape : {tuple, list}
+        shape=(2,)
+        Indicates the shape of the output array
+
+    sigma_0 : {float}
+        Indicates the standard deviation of the filter envelope along
+        the oscillation axis
+
+    slant : {float}
+        Indicates the standard deviation of the filter envelope along
+        the axis orthogonal to the oscillation. It is given relatively
+        with respect to sigma_0 (sigma_orthog = slant * sigma_0)
+
+    xi : {float}
+        The oscillation wave number
+
+    theta : {float}
+        The oscillation wave orientation 
+        (0 is a downward pointing wave vector)
+
+    offset : {tuple, list, ndarray}
+        shape=(2,)
+        Possible offset for the filter from the origin. Defaults to 0
+
+
+    See also
+    --------
+    Morlet wavelets
+    """
+
+    if slant is None:
+        slant = 1.
+    if offset is None:
+        offset = np.zeros([2, 1, 1], dtype='int64')
+    else:
+        offset = np.asanyarray(offset).reshape(2, 1, 1)
+
+    g = np.mgrid[-shape[0] / 2:shape[0] / 2, -shape[1] / 2:shape[1] / 2]
+    g -= offset
+
+    rot = rotation_matrix_2d(theta)
+    invrot = np.linalg.inv(rot)
+    rot_g = invrot.dot(g.reshape(2, -1))
+    precision_matrix = np.diag([1., slant ** 2]) / (sigma0 ** 2)
+    mahalanobis = (rot_g * (precision_matrix.dot(rot_g))).sum(0)
+
+    raw_gabor = np.exp(-mahalanobis / 2 + 1j * xi * rot_g[0])
+
+    gabor = np.fft.fftshift(raw_gabor.reshape(shape)) / (
+        2 * np.pi * sigma0**2 / slant**2)
+
+    # return transposed in order to be compatible with matlab version
+
+    return gabor.T
+
+
+def morlet_2d_noDC(shape, sigma, xi, theta, slant=None, offset=None):
+
+    gabor = gabor_2d(shape, sigma, xi, theta, slant, offset)
+    envelope = np.abs(gabor)
+    K = gabor.sum() / envelope.sum()
+
+    centered = gabor - K * envelope
+
+    return centered
 
 
 def morlet_filter_bank_2d(shape, Q=1, L=8, J=4,
@@ -230,31 +306,5 @@ def morlet_filter_bank_2d(shape, Q=1, L=8, J=4,
     return filters
 
 
-# if __name__ == "__main__":
-#     Q, J, L = 1, 4, 8
-#     sigma_psi = 8
-#     sigma_phi = 8
-#     filters = morlet_filter_bank_2d((128, 128), Q=Q, J=J, L=L,
-#                                     sigma_psi=sigma_psi,
-#                                     sigma_phi=sigma_phi,
-#                                     xi_psi=np.pi / 16.)
-
-#     import pylab as pl
-#     pl.figure()
-#     pl.subplot(2 * J + 1, L, 1)
-#     pl.imshow(np.fft.fftshift(filters['phi']))
-#     pl.axis('off')
-#     pl.gray()
-#     pl.subplot(2 * J + 1, L, 2)
-#     pl.imshow(filters['littlewood_paley'])
-#     pl.axis('off')
-#     for j in range(J):
-#         for l in range(L):
-#             pl.subplot(2 * J + 1, L, 1 + (2 * j + 1) * L + l)
-#             pl.imshow(np.real(np.fft.fftshift(filters['psi'][j][l])))
-#             pl.axis('off')
-#             pl.subplot(2 * J + 1, L, 1 + (2 * j + 2) * L + l)
-#             pl.imshow(np.imag(np.fft.fftshift(filters['psi'][j][l])))
-#             pl.axis('off')
-
-#     pl.show()
+if __name__ == "__main__":
+    pass

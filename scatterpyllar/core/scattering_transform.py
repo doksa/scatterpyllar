@@ -5,39 +5,104 @@ import scipy.fftpack
 import sys
 import time
 
-sys.path.append('/Users/doksa/Dropbox/Projects/mkl_fft')
 import mkl_fft
 
 from ..filters.utils import fft_convolve
 
 
-def generate_lambda_tree(J, L, max_layer):
-    
-    lambda_tree = dict(zip([(0, 0)], [dict()]))
+def generate_lambda_list(J, L, max_layer=2):
+    """Generate a list of lambda indices of the scattering transform.
 
-    lambda_list = [(j, l) for j in range(1, J + 1) for l in range(L)]
+    This is mainly used in gradient computations for inverse scattering.
 
-    for lam in lambda_tree.keys():
-        lam()
+    Parameters
+    ----------
+    J : int
+        The largest wavelet scale used.
+    L : int
+        Number of rotations per scale.
+    max_layer : int, optional
+        The number of layers. By default, and in practice always, 2.
 
-    for layer_m in range(1, max_layer + 1):
-        lambda_list.append([])
-        for j in range(lambda_list[layer_m - 1][0][0] + 1, J + 1):
-            for r in range(L):
-                lambda_list[layer_m].append((j, r))
+    Returns
+    -------
+    lambda_list : list 
+
+        A list of length max_layer with the i-th entry being the list of
+        lambda indices at the i-th layer. The indices themselves are tuples of
+        tuples so that the parent indices are included.
+
+    Examples
+    --------
+    >>> generate_lambda_list(2, 2)
+
+    """
+
+    lambda_list = [[((0, 0),)]]
+    for layer_m in range(max_layer):
+        for lam in lambda_list[layer_m]:
+            print lam
+            lam_children = [lam + ((j, l),) for j in range(lam[-1][0] + 1, J + 1)
+                            for l in range(L)]
+            
+            # if there are any children, add them to the list
+            if lam_children:
+                lambda_list.append(lam_children)
 
 
-def number_of_coeffs(max_layer, J, L):
+    return lambda_list
+
+
+
+
+def number_of_coeffs(J, L, max_layer=2):
+    """Returns the total number of coefficients in a delocalized scattering
+    transform (the transform size).
+
+    Parameters
+    ----------
+    J : int
+        The largest wavelet scale used.
+    L : int
+        Number of rotations per scale.
+    max_layer : int, optional
+        The number of layers. By default, and in practice always, 2.
+
+    Returns
+    -------
+    n : int
+        The number of coefficients.
+
+    """
+
     # A subsampled image is considered to be 1 coefficient. The actual number
     # of scalars is larger.
-    
+
     n_coeffs = scipy.special.binom(J, 
         np.arange(max_layer + 1)) * (L ** np.arange(max_layer + 1))
     return n_coeffs.sum()
 
 
 def scat2vec(scat):
-    # For now, only for non-localized transform
+    """Vectorize a delocalized scattering dictionary.
+
+    Parameters
+    ----------
+    scat : dict
+        The scattering transform dictionary.
+
+    Returns
+    -------
+    vec : array_like
+        An (n_coeffs by 1) vector of scattering coefficients.
+
+    See Also
+    --------
+    vec2scat
+
+
+    """
+
 
     vec = np.zeros(
         (len(scat['coeffs']), 1),
@@ -57,6 +122,30 @@ def scat2vec(scat):
 
 
 def vec2scat(vec, scat):
+    """Convert a scattering vector back to a dictionary.
+
+    Parameters
+    ----------
+    vec : array_like
+        An (n_coeffs by 1) vector of scattering coefficients.
+    scat : dict
+        The scattering transform dictionary.
+
+    Returns
+    -------
+    scat : dict
+        The scattering transform dictionary.
+
+    See Also
+    --------
+    scat2vec
+
+    Notes
+    -----
+    Conversion is in-place, so that the returned object is same as scat.
+    
+
+    """
 
     i = 0
     for layer_m in range(len(scat['lambda_list'])):
@@ -120,7 +209,7 @@ def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_c
         dtype_complex = 'complex128'
 
     ## Allocate the transform container
-    value = np.zeros((number_of_coeffs(max_layer, J, L),) + scat_shape, \
+    value = np.zeros((number_of_coeffs(J, L, max_layer),) + scat_shape, \
         dtype=dtype)
     scat = dict(coeffs=dict(), all_values=value)
 
@@ -196,8 +285,8 @@ def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_c
     return scat, value_no_lowpass
 
 
-def apply_lowpass(img, phi, J, N_scat, fft, ifft, type_complex='complex64'):
-    
+def apply_lowpass(img, phi, J, N_scat, fft, ifft, rfft, irfft, type_complex='complex64'):
+
     # NB: I could compute N_scat here, but in case we want to oversample, this
     # may be useful. I should make a class.
 
@@ -208,14 +297,14 @@ def apply_lowpass(img, phi, J, N_scat, fft, ifft, type_complex='complex64'):
     # out will in the end point to a downsampled lowpassed image
     # out = ifft(fft(img, axis=1)
     #    * phi[0, :].reshape(1, N_nolp), axis=1)[:, ::dsf]
-    
+
     # TO DO: use real transforms
 
     out = np.zeros((img.shape[0], N_nolp_r), dtype=type_complex)
-    out = mkl_fft.rfft(img, axis=1, out=out) * phi[0, :N_nolp_r].reshape(1, N_nolp_r)
-    out = mkl_fft.irfft(out, axis=1)[:, ::dsf].copy()
-    out = mkl_fft.rfft(out, axis=0) * phi[:N_nolp_r, 0].reshape(N_nolp_r, 1)
-    out = mkl_fft.irfft(out, axis=0)[::dsf, :]
+    out = rfft(img, axis=1, out=out) * phi[0, :N_nolp_r].reshape(1, N_nolp_r)
+    out = irfft(out, axis=1)[:, ::dsf].copy()
+    out = rfft(out, axis=0) * phi[:N_nolp_r, 0].reshape(N_nolp_r, 1)
+    out = irfft(out, axis=0)[::dsf, :]
     out = 2**(J - 1) * np.real(out)
 
     return out
