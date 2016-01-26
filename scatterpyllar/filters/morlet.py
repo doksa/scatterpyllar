@@ -117,8 +117,7 @@ from utils import rotation_matrix_2d
 
 
 def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
-    """
-    Returns a Gabor filter following the specifications
+    """Returns a Gabor filter following the specifications
 
     This function creates a 2D complex Gabor filter. All parameters
     are taken to be in integer grid space
@@ -129,23 +128,18 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
     shape : {tuple, list}
         shape=(2,)
         Indicates the shape of the output array
-
-    sigma_0 : {float}
+    sigma_0 : float
         Indicates the standard deviation of the filter envelope along
         the oscillation axis
-
-    slant : {float}
+    slant : float
         Indicates the standard deviation of the filter envelope along
         the axis orthogonal to the oscillation. It is given relatively
         with respect to sigma_0 (sigma_orthog = slant * sigma_0)
-
-    xi : {float}
+    xi : float
         The oscillation wave number
-
-    theta : {float}
+    theta : float
         The oscillation wave orientation 
         (0 is a downward pointing wave vector)
-
     offset : {tuple, list, ndarray}
         shape=(2,)
         Possible offset for the filter from the origin. Defaults to 0
@@ -154,6 +148,7 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
     See also
     --------
     Morlet wavelets
+
     """
 
     if slant is None:
@@ -208,35 +203,27 @@ def morlet_filter_bank_2d(shape, Q=1, L=8, J=4,
 
     Parameters
     ----------
-
     shape : {tuple, list, ndarray}
         shape=(2,)
         Tuple indicating the shape of the filters to be generated
-
-    Q : {integer}
+    Q : int
         Number of scales per octave (constant-Q filter bank)
-
-    J : {integer}
+    J : int
         Total number of scales
-
-    L : {integer}
+    L : int
         Number of orientations
-
-    sigma_phi : {float}
+    sigma_phi : float
         standard deviation of low-pass mother wavelet
-
-    sigma_psi : {float}
+    sigma_psi : float
         standard deviation of the envelope of the high-pass psi_0
-
-    xi_psi : {float}
+    xi_psi : float
         frequency peak of the band-pass mother wavelet
-
-    slant_psi : {float}
+    slant_psi : float
         ratio between axes of elliptic envelope. Smaller means more
         orientation selective
-
-    min_margin : {integer}
+    min_margin : int
         Padding for convolution
+
     """
 
     fft, ifft, fft2, ifft2, rfft, irfft = select_fft(fft_choice)
