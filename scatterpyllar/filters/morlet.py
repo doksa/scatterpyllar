@@ -116,7 +116,7 @@ def select_fft(fft_choice):
 from utils import rotation_matrix_2d
 
 
-def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
+def gabor_2d(shape, sigma0, xi, theta, slant=None, pyramid=False, offset=None):
     """Returns a Gabor filter following the specifications
 
     This function creates a 2D complex Gabor filter. All parameters
@@ -151,15 +151,23 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
 
     """
 
+    # to be compatible with the Matlab version
+    shape = (shape[1], shape[0])
+
     if slant is None:
         slant = 1.
     if offset is None:
-        offset = np.zeros([2, 1, 1], dtype='int64')
-    else:
-        offset = np.asanyarray(offset).reshape(2, 1, 1)
+        if pyramid:
+            offset = (shape[0]/2, shape[1]/2)
+        else:
+            offset = (-(-shape[0]/2), -(-shape[1]/2))
 
-    g = np.mgrid[-shape[0] / 2:shape[0] / 2, -shape[1] / 2:shape[1] / 2]
+    offset = np.asanyarray(offset).reshape(2, 1, 1)
+
+    # to understand the following, note that 5 / 2 = 2, -5 / 2 = -3
+    g = np.mgrid[0:shape[0], 0:shape[1]]
     g -= offset
+    print g[:3, :3, :]
 
     rot = rotation_matrix_2d(theta)
     invrot = np.linalg.inv(rot)
@@ -169,17 +177,30 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, offset=None):
 
     raw_gabor = np.exp(-mahalanobis / 2 + 1j * xi * rot_g[0])
 
-    gabor = np.fft.fftshift(raw_gabor.reshape(shape)) / (
-        2 * np.pi * sigma0**2 / slant**2)
+    if pyramid:
+        gabor = raw_gabor.reshape(shape) / (2 * np.pi * sigma0**2 / slant**2)
+    else:
+        gabor = np.fft.fftshift(raw_gabor.reshape(shape)) / (
+            2 * np.pi * sigma0**2 / slant**2)
 
     # return transposed in order to be compatible with matlab version
-
     return gabor.T
 
 
 def morlet_2d_noDC(shape, sigma, xi, theta, slant=None, offset=None):
 
-    gabor = gabor_2d(shape, sigma, xi, theta, slant, offset)
+    gabor = gabor_2d(shape, sigma, xi, theta, slant, pyramid=False, offset=offset)
+    envelope = np.abs(gabor)
+    K = gabor.sum() / envelope.sum()
+
+    centered = gabor - K * envelope
+
+    return centered
+
+
+def morlet_2d_pyramid(shape, sigma, xi, theta, slant=None, offset=None):
+
+    gabor = gabor_2d(shape, sigma, xi, theta, slant, pyramid=True, offset=offset)
     envelope = np.abs(gabor)
     K = gabor.sum() / envelope.sum()
 
@@ -294,4 +315,8 @@ def morlet_filter_bank_2d(shape, Q=1, L=8, J=4,
 
 
 if __name__ == "__main__":
+    q = morlet_2d_pyramid((16, 8), 0.9, 0.8, 1, None)    
+    print np.abs(q[5:8, 5:8])
+    print q.shape
+
     pass
