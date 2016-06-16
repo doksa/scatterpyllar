@@ -208,6 +208,23 @@ def select_fft(fft_choice):
     return fft, ifft, fft2, ifft2, rfft, irfft, rfft2, irfft2
 
 
+def cce2full(A):
+
+    # Assume all square for now
+
+    N = A.shape
+    N_half = N[0]//2 + 1
+    out = np.empty((A.shape[0], A.shape[0]), dtype=A.dtype)
+    out[:, :N_half] = A
+
+    out[1:, N_half:] = np.rot90(A[1:, 1:-1], 2).conj()
+
+    # Complete the first row
+    out[0, N_half:] = A[0, -2:0:-1].conj()
+
+    return out
+
+
 def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_choice='mkl_fft'):
     """Compute the 2D scattering transform.
 
@@ -295,8 +312,7 @@ def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_c
             ## Compute the convolutions for the next layer
             if layer_m < max_layer:
                 
-                # TODO: cce2full should not depend on mkl_fft
-                F_U_ml = mkl_fft.cce2full(rfft2(value_no_lowpass[lam]['envelope']))
+                F_U_ml = cce2full(rfft2(value_no_lowpass[lam]['envelope']))
 
                 lam_children = [(j, l) for j in range(lam[-1][0] + 1, J + 1) 
                                        for l in range(L)]
