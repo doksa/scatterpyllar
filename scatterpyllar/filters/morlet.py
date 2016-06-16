@@ -311,11 +311,3 @@ def morlet_filter_bank_2d(shape, Q=1, L=8, J=4,
     filters['littlewood_paley'] = little_wood_paley
 
     return filters
-
-
-if __name__ == "__main__":
-    q = morlet_2d_pyramid((16, 8), 0.9, 0.8, 1, None)    
-    print np.abs(q[5:8, 5:8])
-    print q.shape
-
-    pass
