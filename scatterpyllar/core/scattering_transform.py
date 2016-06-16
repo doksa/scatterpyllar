@@ -7,7 +7,7 @@ import time
 
 import mkl_fft
 
-from ..filters.utils import fft_convolve
+# from ..filters.utils import fft_convolve
 
 
 def generate_lambda_list(J, L, max_layer=2):
@@ -143,7 +143,6 @@ def vec2scat(vec, scat):
     Notes
     -----
     Conversion is in-place, so that the returned object is same as scat.
-    
 
     """
 
@@ -159,6 +158,30 @@ def vec2scat(vec, scat):
 
 
 def select_fft(fft_choice):
+    """Returns a set of fft routines from a desired module.
+
+    Parameters
+    ----------
+    fft_choice : {'fftw', 'fftpack', 'fftpack_lite', 'mkl_fft'}
+        'fftw':
+          Use the FFTW library (Fastest Fourier Transform in the West).
+
+        'fftpack':
+          Fortran FFTPACK from scipy.
+
+        'ftpack_lite':
+    
+    Returns
+    -------
+
+    See Also
+    --------
+    mkl_fft (module)
+
+
+    """
+
+
     if fft_choice == 'fftw':
         fft_module =  pyfftw.interfaces.numpy_fft
     elif fft_choice == 'fftpack':
@@ -179,16 +202,32 @@ def select_fft(fft_choice):
     ifft2 = fft_module.ifft2
     rfft = fft_module.rfft
     irfft = fft_module.irfft
+    rfft2 = fft_module.rfft2
+    irfft2 = fft_module.irfft2
 
-
-    return fft, ifft, fft2, ifft2, rfft, irfft
+    return fft, ifft, fft2, ifft2, rfft, irfft, rfft2, irfft2
 
 
 def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_choice='mkl_fft'):
+    """Compute the 2D scattering transform.
+
+    Parameters
+    ----------
+        img : 
+        filter_bank : 
+        localized : bool, optional
+        dtype : {single, double}, optional
+        fft_choice : {}
+
+    See Also
+    --------
+    mkl_fft (module), select_fft
+
+    """
 
     max_layer = 2
 
-    fft, ifft, fft2, ifft2, rfft, irfft = select_fft(fft_choice)
+    fft, ifft, fft2, ifft2, rfft, irfft, rfft2, irfft2 = select_fft(fft_choice)
 
     N = img.shape[0]
     logN = np.log2(N)
@@ -247,7 +286,7 @@ def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_c
                 res_phi = int(np.log2(N / N_nolp))
                 phi = filter_bank['phi'][res_phi]
                 scat['coeffs'][lam]['l1'][:] = \
-                    apply_lowpass(value_no_lowpass[lam]['envelope'], phi, J, N_scat, fft, ifft)
+                    apply_lowpass(value_no_lowpass[lam]['envelope'], phi, J, N_scat, fft_choice)
             else:
                 scat['coeffs'][lam]['l1'][:] = \
                     value_no_lowpass[lam]['envelope'].mean()
@@ -255,8 +294,10 @@ def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_c
 
             ## Compute the convolutions for the next layer
             if layer_m < max_layer:
-                F_U_ml = mkl_fft.cce2full(mkl_fft.mkl_rfft2(value_no_lowpass[lam]['envelope']))
                 
+                # TODO: cce2full should not depend on mkl_fft
+                F_U_ml = mkl_fft.cce2full(rfft2(value_no_lowpass[lam]['envelope']))
+
                 lam_children = [(j, l) for j in range(lam[-1][0] + 1, J + 1) 
                                        for l in range(L)]
 
@@ -285,7 +326,9 @@ def scattering_transform(img, filter_bank, localized=True, dtype='single', fft_c
     return scat, value_no_lowpass
 
 
-def apply_lowpass(img, phi, J, N_scat, fft, ifft, rfft, irfft, type_complex='complex64'):
+def apply_lowpass(img, phi, J, N_scat, fft_choice='mkl_fft',type_complex='complex64'):
+
+    fft, ifft, fft2, ifft2, rfft, irfft, rfft2, irfft2 = select_fft(fft_choice)
 
     # NB: I could compute N_scat here, but in case we want to oversample, this
     # may be useful. I should make a class.
@@ -301,7 +344,12 @@ def apply_lowpass(img, phi, J, N_scat, fft, ifft, rfft, irfft, type_complex='com
     # TO DO: use real transforms
 
     out = np.zeros((img.shape[0], N_nolp_r), dtype=type_complex)
-    out = rfft(img, axis=1, out=out) * phi[0, :N_nolp_r].reshape(1, N_nolp_r)
+
+    if fft_choice == 'mkl_fft':
+        out = rfft(img, axis=1, out=out) * phi[0, :N_nolp_r].reshape(1, N_nolp_r)
+    else:
+        out[:] = rfft(img, axis=1) * phi[0, :N_nolp_r].reshape(1, N_nolp_r)
+
     out = irfft(out, axis=1)[:, ::dsf].copy()
     out = rfft(out, axis=0) * phi[:N_nolp_r, 0].reshape(N_nolp_r, 1)
     out = irfft(out, axis=0)[::dsf, :]
