@@ -209,6 +209,22 @@ def select_fft(fft_choice):
 
 
 def cce2full(A):
+    
+    """Converts the complex-conjugate-even format resulting from real ffts
+    into a full matrix. This implementation is for 2D arrays.
+
+    Parameters
+    ----------
+    A : array_like
+        Input signal in the CCE format.
+
+    Returns
+    -------
+    out : array_like
+        Input signal converted into a full-format 2D array.
+
+    """
+
 
     # Assume all square for now
 
