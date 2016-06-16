@@ -167,7 +167,6 @@ def gabor_2d(shape, sigma0, xi, theta, slant=None, pyramid=False, offset=None):
     # to understand the following, note that 5 / 2 = 2, -5 / 2 = -3
     g = np.mgrid[0:shape[0], 0:shape[1]]
     g -= offset
-    print g[:3, :3, :]
 
     rot = rotation_matrix_2d(theta)
     invrot = np.linalg.inv(rot)
